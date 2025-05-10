@@ -1,0 +1,2 @@
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+OLLAMA_MODEL_NAME = "gemma3:latest"
