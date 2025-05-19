@@ -48,7 +48,7 @@ def build_prompt_with_chunks(question: str, retrieved_chunks: List[TextChunk]) -
         f"If the snippets provide sufficient information, answer the question directly. "
         f"If the snippets do not contain enough information to answer the question fully, state that the provided context is insufficient or doesn't contain the answer.\n\n"
         f"IMPORTANT NOTE: When referring to any information, also provide the source. IT SHOULD BE NOTED LIKE SO: (Source - Chunk [insert number here]: [chunk title] [chunk url] )."
-        f"Lastly: End the generated answer with a YES or NO in a seperate paragraph answering the question. If it cannot be answered as YES or NO, then you should say N/A"
+        f"CRUCIAL: End the generated answer with an evaluation, like so \"Label: [evaluation]\". The available labels are: \"true\", \"mostly-true\", \"half-true\", \"barely-true\", \"false\", \"pants-fire\"."
         f"Answer:"
     )
     return prompt
