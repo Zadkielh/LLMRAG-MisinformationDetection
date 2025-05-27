@@ -379,3 +379,8 @@ FIPS_MANUAL_MAP = {
     "SERRANA BANK": "BN", # (Disputed) - Note: BN also Benin, careful if names overlap
     "TROMELIN ISLAND": "TE"
 }
+
+LOW_CREDIBILITY_SOURCES = [
+    "example-low-cred.com", 
+    "another-untrusted-site.org",
+]

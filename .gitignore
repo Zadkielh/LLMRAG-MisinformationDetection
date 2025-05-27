@@ -5,6 +5,7 @@ __pycache__/
 
 test/*
 liar/*
+*.csv
 # C extensions
 *.so
 

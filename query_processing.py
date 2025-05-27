@@ -231,8 +231,9 @@ class QueryAnalyzer:
         themes, expanded_themes = self.extract_themes(question)
         return entities, themes, expanded_themes
     
-def build_bigquery_filter_with_issues(entities: Dict[str, List[Tuple[str, Any]]],
+def build_bigquery_filter_with_issues_filtered(entities: Dict[str, List[Tuple[str, Any]]],
                                       structured_themes: Dict[str, List[str]],
+                                      filtered_sources: List,
                                      loose: bool = False) -> str:
     category_clauses = []
 
@@ -279,18 +280,29 @@ def build_bigquery_filter_with_issues(entities: Dict[str, List[Tuple[str, Any]]]
             combined_theme_filter_str = f"({' AND '.join(issue_group_clauses)})"
             print("--- Using STRICT theme filter logic (AND between issue groups).")
 
-    if entity_filter_str != "1=1" and combined_theme_filter_str != "1=1":
-        final_filter = f"({entity_filter_str}) AND ({combined_theme_filter_str})"
-    elif entity_filter_str != "1=1":
-        final_filter = entity_filter_str
-    elif combined_theme_filter_str != "1=1":
-        final_filter = combined_theme_filter_str
-    else:
-        final_filter = "1=1"
+    source_filter_str = "1=1"
+    if filtered_sources:
+        safe_filtered_sources = [source.replace("'", "''") for source in filtered_sources]
+        sources_list_str = "', '".join(safe_filtered_sources)
+        source_filter_str = f"(SourceCommonName NOT IN ('{sources_list_str}'))"
 
-    if final_filter == "1=1":
-        print("--- Warning: No specific entity or theme filters generated (issues-based).")
-    print(f"--- Generated BigQuery Filter (issues-based, loose={loose}): {final_filter}")
+    all_filters = []
+    if entity_filter_str != "1=1":
+        all_filters.append(f"({entity_filter_str})")
+    if combined_theme_filter_str != "1=1":
+        all_filters.append(f"({combined_theme_filter_str})")
+    if source_filter_str != "1=1":
+        all_filters.append(source_filter_str)
+
+    if not all_filters:
+        final_filter = "1=1"
+    else:
+        final_filter = " AND ".join(all_filters)
+    
+    if final_filter == "1=1" or not final_filter:
+        final_filter = "1=1"
+        print("--- Warning: No specific entity, theme, or source filters generated.")
+
     return final_filter
 
 
