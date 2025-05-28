@@ -211,7 +211,7 @@ def liar_eval():
         print(f"--- Processed statement ID {result['id']}, Predicted: {result['predicted_label']}, Time: {result['time_taken']:.2f}s")
         
     results_df = pd.DataFrame(results_list)
-    results_df.to_csv("liar_evalutaion_results.csv", index=False)
+    results_df.to_csv("filtered_evalutaion_results.csv", index=False)
     print("\n--- Evaluation results saved.")
 
     if not results_df.empty and 'true_label' in results_df.columns and 'predicted_label' in results_df.columns:
@@ -233,7 +233,7 @@ def liar_eval():
             )
             
             df = pd.DataFrame(report_dict).transpose()
-            df.to_csv("liar_evaluation_class_report.csv")
+            df.to_csv("filtered_evaluation_class_report.csv")
 
         else:
             print("No valid predictions to report metrics on.")

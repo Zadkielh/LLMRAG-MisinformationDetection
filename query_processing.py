@@ -231,6 +231,68 @@ class QueryAnalyzer:
         themes, expanded_themes = self.extract_themes(question)
         return entities, themes, expanded_themes
     
+def build_bigquery_filter_with_issues(entities: Dict[str, List[Tuple[str, Any]]],
+                                      structured_themes: Dict[str, List[str]],
+                                     loose: bool = False) -> str:
+    category_clauses = []
+
+    for column, values in entities.items():
+        if not values: continue
+        
+        likes = []
+        for original_text, value_for_filter in values:
+
+            if column == "V2Locations" and isinstance(value_for_filter, str) and value_for_filter in FIPS_MANUAL_MAP.values():
+                fips_code = value_for_filter
+                likes.append(f"EXISTS (SELECT 1 FROM UNNEST(SPLIT({column}, ';')) AS loc_item WHERE TRIM(SPLIT(loc_item, '#')[SAFE_OFFSET(2)]) = '{fips_code}')")
+            elif column == "V2Locations" and isinstance(value_for_filter, str):
+                likes.append(f"{column} LIKE '%{value_for_filter.replace("'", "''")}%'")
+            elif column == "V2Persons" and isinstance(value_for_filter, list):
+                person_variant_likes = []
+                for variant in value_for_filter:
+                    safe_variant = variant.replace("'", "''")
+                    person_variant_likes.append(f"{column} LIKE '%{safe_variant}%'")
+                if person_variant_likes:
+                    likes.append(f"({' OR '.join(person_variant_likes)})")
+            elif isinstance(value_for_filter, str):
+                likes.append(f"{column} LIKE '%{value_for_filter.replace("'", "''")}%'")
+
+        if likes: 
+            category_clauses.append(f"({' OR '.join(likes)})")
+
+    entity_filter_str = " AND ".join(category_clauses) if category_clauses else "1=1"
+
+    issue_group_clauses = []
+    if structured_themes:
+        for issue_key, theme_list_for_issue in structured_themes.items():
+            if theme_list_for_issue:
+                safe_themes_for_issue = [theme.replace("'", "''") for theme in theme_list_for_issue]
+                theme_likes_for_issue = [f"V2Themes LIKE '%{th}%'" for th in safe_themes_for_issue]
+                issue_group_clauses.append(f"({' OR '.join(theme_likes_for_issue)})")
+    
+    combined_theme_filter_str = "1=1"
+    if issue_group_clauses:
+        if loose:
+            combined_theme_filter_str = f"({' OR '.join(issue_group_clauses)})"
+            print("--- Using LOOSE theme filter logic (OR between issue groups).")
+        else:
+            combined_theme_filter_str = f"({' AND '.join(issue_group_clauses)})"
+            print("--- Using STRICT theme filter logic (AND between issue groups).")
+
+    if entity_filter_str != "1=1" and combined_theme_filter_str != "1=1":
+        final_filter = f"({entity_filter_str}) AND ({combined_theme_filter_str})"
+    elif entity_filter_str != "1=1":
+        final_filter = entity_filter_str
+    elif combined_theme_filter_str != "1=1":
+        final_filter = combined_theme_filter_str
+    else:
+        final_filter = "1=1"
+
+    if final_filter == "1=1":
+        print("--- Warning: No specific entity or theme filters generated (issues-based).")
+    print(f"--- Generated BigQuery Filter (issues-based, loose={loose}): {final_filter}")
+    return final_filter
+    
 def build_bigquery_filter_with_issues_filtered(entities: Dict[str, List[Tuple[str, Any]]],
                                       structured_themes: Dict[str, List[str]],
                                       filtered_sources: List,

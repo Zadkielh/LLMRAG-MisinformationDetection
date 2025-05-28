@@ -5,10 +5,10 @@ import pandas as pd
 import time
 
 from typing import List, Any, Dict
-from query_processing import QueryAnalyzer, build_bigquery_filter_with_issues, build_bigquery_filter
+from query_processing import QueryAnalyzer, build_bigquery_filter_with_issues
 from content_extraction import fetch_titles_for_gkg_rows, build_gkg_documents_from_rows, split_text_into_chunks_by_sentence
 from external_apis import fetch_gkg_from_bigquery
-from embedding_retrieval import embed_query, embed_texts, retrieve_top_chunks, retrieve_chunks_with_mmr
+from embedding_retrieval import embed_query, embed_texts, retrieve_top_chunks
 from data_models import TextChunk
 from llm_interaction import build_prompt_with_chunks, query_ollama
 from dataset_utils import adapt_liar_statement, load_liar_dataset
@@ -34,11 +34,6 @@ async def ask_question(question: str, statement_text: str, label: str, id) -> st
     where_clause = ""
     
     entities, structured_themes_for_bq = analyzer.analyze_question_with_issues(question)
-
-    print("--- SNIP ---")
-    print(structured_themes_for_bq)
-    print(entities)
-    print("--- SNIP ---")
     
     where_clause = build_bigquery_filter_with_issues(entities, structured_themes_for_bq)
 
@@ -144,27 +139,6 @@ async def ask_question(question: str, statement_text: str, label: str, id) -> st
     print(f"--- Retrieving top {NUM_CHUNKS_FOR_LLM} relevant chunks...")
     retrieved_chunks = retrieve_top_chunks(chunk_index, all_chunks_with_meta, query_embedding, top_k=NUM_CHUNKS_FOR_LLM)
 
-    # print(f"--- Retrieving top {NUM_CHUNKS_FOR_LLM} relevant and diverse chunks using MMR (lambda={LAMBDA_MMR})...")
-    # retrieved_chunks = retrieve_chunks_with_mmr(
-    #     query_embedding,
-    #     chunk_embeddings, # Pass the numpy array of embeddings
-    #     all_chunks_with_meta,
-    #     top_n_final=NUM_CHUNKS_FOR_LLM,
-    #     lambda_param=LAMBDA_MMR
-    # )
-
-    # if not retrieved_chunks:
-    #     return "No relevant text chunks found after MMR."
-    
-    # print(f"--- Retrieved {len(retrieved_chunks)} chunks using MMR to use in prompt.")
-    # # (Your existing chunk printing loop for debugging)
-    # print("--- Top Retrieved Chunks (MMR) ---")
-    # for i, chunk_data in enumerate(retrieved_chunks):
-    #    print(f"--- Chunk {i+1} Source: {chunk_data.source_title} ({chunk_data.source_url})")
-    #    print(f"--- Chunk {i+1} Text:\n{chunk_data.text}")
-    #    print("-" * 25)
-
-
     print(f"--- Retrieved {len(retrieved_chunks)} chunks to use in prompt.")
     print("--- Top Retrieved Chunks ---")
     for i, chunk_data in enumerate(retrieved_chunks):
@@ -185,14 +159,11 @@ async def ask_question(question: str, statement_text: str, label: str, id) -> st
     generated_answer = query_ollama(prompt)
     print("\nGenerated Answer:\n", generated_answer)
     
-    # 5. Parse LLM response to get label and justification (this needs robust parsing)
-    # Example simple parsing (you'll need to make this more robust)
     predicted_label = "N/A_PARSE_ERROR"
-    justification = generated_answer # Default to full response if parsing fails
+    justification = generated_answer
     try:
         if "Label:" in generated_answer:
             label_part = generated_answer.split("Label:")[1].strip()
-            # LIAR labels: true, mostly-true, half-true, barely-true, false, pants-fire
             possible_labels = ["true", "mostly-true", "half-true", "barely-true", "false", "pants-fire"]
             for l in possible_labels:
                 if label_part.lower().startswith(l):
@@ -270,13 +241,4 @@ def liar_eval():
 
 
 if __name__ == "__main__":
-    # question = "What is the political situation in Germany regarding energy policy?"
-    # answer = asyncio.run(ask_question(question))
-    # print("\nGenerated Answer:\n", answer)
-
     liar_eval()
-
-    # Feed Liar statement into LLM as a question
-    # Extract subject, speaker, party affiliation and context
-    # Validate against label
-    # Record and display statistics like time spent per statement, accuracy, etc.
