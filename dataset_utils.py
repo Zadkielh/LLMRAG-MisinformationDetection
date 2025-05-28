@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import List, Dict, Any
 
+
 # Liar files don't come with headers
 LIAR_COLUMN_NAMES = [
     "id", "label", "statement", "subject", "speaker", "speaker_job_title",
@@ -11,6 +12,24 @@ LIAR_COLUMN_NAMES = [
 def load_liar_dataset(file_path: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(file_path, sep='\t', header=None, names=LIAR_COLUMN_NAMES)
+        print(f"--- Successfully loaded LIAR dataset.")
+        return df
+    except FileNotFoundError:
+        print("--- Error: LIAR dataset file not found.")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"--- Error loaidng LIAR dataset: {e}")
+        return pd.DataFrame()
+
+LIAR_COLUMN_NAMES_DATE = [
+    "id", "label", "statement", "subject", "speaker", "speaker_job_title",
+    "state_info", "party_affiliation", "barely_true_counts", "false_counts", "half_true_counts",
+    "mostly_true_counts", "pants_on_fire_counts", "context", "date"
+]
+
+def load_liar_dataset_date(file_path: str) -> pd.DataFrame:
+    try:
+        df = pd.read_csv(file_path, sep='\t', header=None, names=LIAR_COLUMN_NAMES_DATE)
         print(f"--- Successfully loaded LIAR dataset.")
         return df
     except FileNotFoundError:
@@ -39,3 +58,4 @@ def adapt_liar_statement(statement_details: Dict[str, Any]) -> str:
     query = " ".join(query)
     print(f"Formulated Query: {query}")
     return query
+

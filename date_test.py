@@ -5,15 +5,15 @@ import pandas as pd
 import time
 
 from typing import List, Any, Dict
-from query_processing import QueryAnalyzer, build_bigquery_filter_with_issues_filtered
+from query_processing import QueryAnalyzer, build_bigquery_filter_with_issues
 from content_extraction import fetch_titles_for_gkg_rows, build_gkg_documents_from_rows, split_text_into_chunks_by_sentence
 from external_apis import fetch_gkg_from_bigquery
 from embedding_retrieval import embed_query, embed_texts, retrieve_top_chunks
 from data_models import TextChunk
 from llm_interaction import build_prompt_with_chunks, query_ollama
-from dataset_utils import adapt_liar_statement, load_liar_dataset
+from dataset_utils import adapt_liar_statement, load_liar_dataset_date
 from sklearn.metrics import classification_report
-from constants import LOW_CREDIBILITY_SOURCES
+
 
 USE_ISSUES_BASED_THEME_LOGIC = True
 
@@ -23,24 +23,23 @@ def process_liar(liar_data_row: pd.Series) -> Dict[str, Any]:
     speaker = liar_data_row['speaker']
     subject = liar_data_row['subject']
     context = liar_data_row['context']
+    date = liar_data_row['date']
 
     query = adapt_liar_statement(liar_data_row.to_dict())
 
-    return asyncio.run(ask_question(query, statement_text, label, liar_data_row['id']))
+    return asyncio.run(ask_question(query, statement_text, label, date, liar_data_row['id']))
 
 
-async def ask_question(question: str, statement_text: str, label: str, id) -> str:
+async def ask_question(question: str, statement_text: str, label: str, date, id) -> str:
     analyzer = QueryAnalyzer()
 
     where_clause = ""
     
     entities, structured_themes_for_bq = analyzer.analyze_question_with_issues(question)
-
-    filtered_sources = LOW_CREDIBILITY_SOURCES
     
-    where_clause = build_bigquery_filter_with_issues_filtered(entities, structured_themes_for_bq, filtered_sources)
+    where_clause = build_bigquery_filter_with_issues(entities, structured_themes_for_bq)
 
-    gkg_rows = fetch_gkg_from_bigquery(where_clause, limit=500, days_to_look_back=90)
+    gkg_rows = fetch_gkg_from_bigquery(where_clause, limit=500, start_date=date, days_to_look_back=30)
 
     if len(gkg_rows) <= 0:
         entities['V2Organizations'] = None
@@ -49,8 +48,8 @@ async def ask_question(question: str, statement_text: str, label: str, id) -> st
         while len(looser_themes) > 1:
             looser_themes.popitem()
         
-        where_clause = build_bigquery_filter_with_issues_filtered(entities, looser_themes, filtered_sources, loose=True)
-        gkg_rows = fetch_gkg_from_bigquery(where_clause, limit=500, days_to_look_back=90)
+        where_clause = build_bigquery_filter_with_issues(entities, looser_themes, loose=True)
+        gkg_rows = fetch_gkg_from_bigquery(where_clause, limit=500, start_date=date, days_to_look_back=30)
 
     if len(gkg_rows) <= 0:
         print("--- No articles found, exiting!")
@@ -190,13 +189,13 @@ async def ask_question(question: str, statement_text: str, label: str, id) -> st
 
 
 def liar_eval():
-    liar_df = load_liar_dataset("liar/test.tsv")
+    liar_df = load_liar_dataset_date("liar/test_dates.tsv")
     if liar_df.empty:
         return
 
     results_list = []
 
-    for index, row in liar_df.head(100).iterrows():
+    for index, row in liar_df.head(4).iterrows():
         start_time = time.time()
         result = process_liar(row)
         if not result:
@@ -207,7 +206,7 @@ def liar_eval():
         print(f"--- Processed statement ID {result['id']}, Predicted: {result['predicted_label']}, Time: {result['time_taken']:.2f}s")
         
     results_df = pd.DataFrame(results_list)
-    results_df.to_csv("filtered_evalutaion_results.csv", index=False)
+    results_df.to_csv("liar_date_evalutaion_results.csv", index=False)
     print("\n--- Evaluation results saved.")
 
     if not results_df.empty and 'true_label' in results_df.columns and 'predicted_label' in results_df.columns:
@@ -229,7 +228,7 @@ def liar_eval():
             )
             
             df = pd.DataFrame(report_dict).transpose()
-            df.to_csv("filtered_evaluation_class_report.csv")
+            df.to_csv("liar_date_evaluation_class_report.csv")
 
         else:
             print("No valid predictions to report metrics on.")

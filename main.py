@@ -37,7 +37,7 @@ async def ask_question(question: str, statement_text: str, label: str, id) -> st
     
     where_clause = build_bigquery_filter_with_issues(entities, structured_themes_for_bq)
 
-    gkg_rows = fetch_gkg_from_bigquery(where_clause, limit=500, days_to_look_back=90)
+    gkg_rows = fetch_gkg_from_bigquery(where_clause, limit=500, start_date=None, days_to_look_back=90)
 
     if len(gkg_rows) <= 0:
         entities['V2Organizations'] = None

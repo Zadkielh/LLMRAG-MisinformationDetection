@@ -19,11 +19,31 @@ def fetch_gdelt_themes(url: str = "http://data.gdeltproject.org/api/v2/guides/LO
     return themes
 
 
-def fetch_gkg_from_bigquery(where_clause: str, limit=100, days_to_look_back: int = 7) -> list[dict]:
+def fetch_gkg_from_bigquery(where_clause: str, limit=100, start_date: str = None, days_to_look_back: int = 7) -> list[dict]:
     client = bigquery.Client()
 
-    partition_start_date = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days_to_look_back)).strftime('%Y-%m-%d')
+    # if start_date is None:
+    #     start_date = datetime.datetime.now(datetime.timezone.utc).date()
+    # else:
+    #     parsed_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
 
+    # if parsed_date:
+    #     partition_start_date = parsed_date.strftime('%Y-%m-%d')
+    # else:
+    #     partition_start_date = start_date.strftime('%Y-%m-%d')
+
+    if start_date is None:
+        parsed_date = datetime.datetime.now(datetime.timezone.utc).date()
+    else:
+        parsed_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+
+    partition_start_date = parsed_date.strftime('%Y-%m-%d')
+    partition_end_date = (parsed_date - datetime.timedelta(days=days_to_look_back)).strftime('%Y-%m-%d')
+
+
+
+    #partition_end_date = (start_date - datetime.timedelta(days=days_to_look_back)).strftime('%Y-%m-%d')
+    
     query = f"""
     SELECT
       DocumentIdentifier,
@@ -37,7 +57,8 @@ def fetch_gkg_from_bigquery(where_clause: str, limit=100, days_to_look_back: int
     FROM
       `gdelt-bq.gdeltv2.gkg_partitioned`
     WHERE
-      _PARTITIONTIME >= TIMESTAMP("{partition_start_date}")
+      _PARTITIONTIME <= TIMESTAMP("{partition_start_date}")
+      AND _PARTITIONTIME >= TIMESTAMP("{partition_end_date}")
       AND ({where_clause})
     LIMIT {limit}
     """
